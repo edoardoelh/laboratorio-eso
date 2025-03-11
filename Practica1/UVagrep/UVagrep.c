@@ -10,11 +10,8 @@ int main(int argc, char *argv[]) {
 	if(argc == 2){
 		char line[1000];
 		while(fgets(line,sizeof(line),stdin)!=NULL){
-		//puts(line);
-		//while(line!=null){
-		//while((nread = fgets(line, sizeof(line), stdin)) != -1){
 			if(strstr(line, (char *)argv[1]) != NULL)  
-				fputs(line, stdout);
+				printf("%s", line);
 		}
 	}	
 	else{	
@@ -22,7 +19,6 @@ int main(int argc, char *argv[]) {
 			FILE *fp = fopen(argv[i], "r"); 
 			char *line = NULL;
 			size_t size = 0;
-			//ssize_t nread;
 			if(fp == NULL){
 				printf("%s\n", "UVagrep: cannot open file");
 				exit(1);
