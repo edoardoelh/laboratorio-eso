@@ -19,27 +19,22 @@ int main(int argc, char *argv[]) {
 		}
 		else{
 			while((nread = getline(&line, &size, fp)) != -1){
-				//printf("%s",line);
 				for(int j=0;j<strlen(line);j++){
 					if(!lastCharRead) lastCharRead=line[j];
 					if(line[j]!=lastCharRead){
-						//printf("%s%d::%d","Debug:",concurrentCharCount,lastCharRead);
 						fwrite(&concurrentCharCount,sizeof(int),1,stdout);
                					fwrite(&lastCharRead,sizeof(char),1,stdout);
-						concurrentCharCount=0;
+						concurrentCharCount=1;
 						lastCharRead=line[j];
 					}
 					else{
-						//lastCharRead=line[j];
 						concurrentCharCount++;
 					}
-					//printf("\n");
 				}
 			}
 		}
 		fclose(fp);
 	}	
-	//printf("%s%d::%d","Debug:",concurrentCharCount,lastCharRead);
 	fwrite(&concurrentCharCount,sizeof(int),1,stdout);
         fwrite(&lastCharRead,sizeof(char),1,stdout);
 	return(0);
