@@ -1,3 +1,7 @@
 *.rc
 *.out
 *.err
+UVacat
+UVagrep
+UVazip
+UVaunzip
