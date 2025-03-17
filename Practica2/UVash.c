@@ -84,10 +84,17 @@ Command *prepareCommand(char *command){
 	while((commandSplited = strtok(NULL," \t")) != NULL){
 		if (strcmp(commandSplited, ">") == 0) {
             		char *next = strtok(NULL, " \t");
-            		if (next) preprocessCommand->outFile = strdup(next);
+            		if (next){
+			       	preprocessCommand->outFile = strdup(next);
+				if((commandSplited = strtok(NULL," \t")) != NULL){
+					printError();
+					exit(0);
+				}
+				break;
+			}
 			else{
 				printError();
-				exit(1);
+				exit(0);
 			}
         	}else{
 			preprocessCommand->arguments[i++] = strdup(commandSplited);
@@ -109,11 +116,17 @@ bool executeCommand(Command *command){
 	}
 	if(pid == 0){
 //ESTO SE TIENE QUE ARREGLAR (hay que hacer que el comando se ejecute correctamente)
-	       	if(execvp(command->command,command->arguments) == -1){
-			printError();
-		       	exit(1);
+		if (command->outFile != NULL) {
+			printf("Hace esto otro");
+			FILE *fp = fopen(command->outFile, "w");
+			dup2(fileno(fp),1);
+			dup2(fileno(fp),2);
 
 		}
+       		if(execvp(command->command,command->arguments) == -1){
+			printError();
+		       	exit(1);
+		}	
 		exit(0);
 	}else{
 		wait(&status);
@@ -143,7 +156,13 @@ bool builtInCommands(Command *command){
 
 int main (int argc, char *argv[]){
 	char* command;
-	if(argc == 2) if(checkIfArgvIsFile(argv)) runFile(argv);
+	if(argc == 2){
+	       	if(checkIfArgvIsFile(argv)) runFile(argv);
+		else{
+			printError();
+			exit(1);
+		}
+	}
 	if(argc > 2){
 	       	printError();
 		exit(1);
