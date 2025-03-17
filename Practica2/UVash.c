@@ -3,6 +3,17 @@
 #include <string.h>
 #include <stdbool.h>
 #include <unistd.h>
+#include <sys/wait.h>
+
+//--- Start Structures definitions ---
+
+typedef struct command{
+	char *command;
+	char **arguments;
+	char *outFile;
+} Command;
+
+//--- End Structures definitios ---
 
 //--- Start declarations ---
 
@@ -11,7 +22,10 @@ void runFiles();
 void printError();
 char *readCommand();
 void deleteNewlineCharacter();
-bool executeCommand(char *command);
+Command *prepareCommand(char *command);
+bool executeCommand(Command *command);
+bool builtInCommands(Command *command);	
+
 
 // --- End declarations ---
 
@@ -23,8 +37,15 @@ bool checkIfArgvIsFile(char *argv[]){
 	return true;
 }
 
-void runFiles(){
-	printf("Es un archivo\n");
+void runFile(char *argv[]){
+	FILE *fp = fopen(argv[1],"r");
+	char *line = NULL;
+	ssize_t nread;
+	size_t size = 0;
+	while((nread = getline(&line,&size,fp)) != -1){
+		deleteNewlineCharacter(line);
+		executeCommand(prepareCommand(line));//Aqui lo mismo que en el main, leer multiples comandos en una sola linea y la ejecucion paralela
+	}
 	exit(0);
 }
 
@@ -34,7 +55,7 @@ void printError(){
 }
 
 char *readCommand(){
-	char *command;
+	char* command;
 	size_t numBytes = 0;
 	printf("UVash>");
 	getline(&command,&numBytes,stdin);
@@ -47,10 +68,73 @@ void deleteNewlineCharacter(char *text){
 	if(len > 0 && text[len-1] == '\n') text[len-1] = '\0'; 
 }
 
-bool executeCommand(char* command){
-	char* argumentList[] = {command, NULL};	
-	if(execvp(command,argumentList) == -1) return false;
+Command *prepareCommand(char *command){
+	//Antes de llegar aqui se tendria que preprocesar el char *command de cara al paralelismo 
+	char *copyCommand = strdup(command);
+	Command *preprocessCommand = (Command *)malloc(sizeof(Command));
+	preprocessCommand->arguments = (char **)malloc(sizeof(char *) * 10);
+	int i = 1;
+
+	//Capture of the first element of the command	
+	char *commandSplited = strtok(copyCommand," \t");
+	preprocessCommand->command = strdup(commandSplited);
+
+	//Capture of the arguments of the command
+	preprocessCommand->arguments[0] = preprocessCommand->command;
+	while((commandSplited = strtok(NULL," \t")) != NULL){
+		if (strcmp(commandSplited, ">") == 0) {
+            		char *next = strtok(NULL, " \t");
+            		if (next) preprocessCommand->outFile = strdup(next);
+			else{
+				printError();
+				exit(1);
+			}
+        	}else{
+			preprocessCommand->arguments[i++] = strdup(commandSplited);
+		}
+	}
+	preprocessCommand->arguments[i]=NULL;
+	return preprocessCommand;
+}
+
+bool executeCommand(Command *command){
+	int status;
+	//printf("Comando:%s\n",command->command);
+	//if(command->arguments[1]==NULL)printf("Es null");
+	if(builtInCommands(command)) return true;
+	pid_t pid = fork();
+	if(pid == -1){
+		printError();
+		exit(1);
+	}
+	if(pid == 0){
+//ESTO SE TIENE QUE ARREGLAR (hay que hacer que el comando se ejecute correctamente)
+	       	if(execvp(command->command,command->arguments) == -1){
+			printError();
+		       	exit(1);
+
+		}
+		exit(0);
+	}else{
+		wait(&status);
+	}
 	return true;
+}
+
+
+bool builtInCommands(Command *command){
+	//printf("Argumento:%s\n",command->arguments[1]);
+	if(strcmp(command->command,"exit")==0){
+	       	if(command->arguments[1]==NULL) exit(0);
+		else printError();
+		return true;
+	}
+	if(strcmp(command->command,"cd") == 0){ 
+		if(command->arguments[1]!=NULL && command->arguments[2]==NULL)chdir(command->arguments[1]); 
+		else printError();
+		return true;
+	}
+	return false;
 }
 
 // --- End function definicion ---
@@ -58,13 +142,15 @@ bool executeCommand(char* command){
 // --- Start main function ---
 
 int main (int argc, char *argv[]){
-	char *command;	
-	bool exit = false;//Cuando el while sea un bucle infitino (si funciona el exit) se tendra que borrar
-	while(!exit){//Esto despues tendra que ser un bucle infinito
-		if(argc > 1) if(checkIfArgvIsFile(argv)) runFiles();
+	char* command;
+	if(argc == 2) if(checkIfArgvIsFile(argv)) runFile(argv);
+	if(argc > 2){
+	       	printError();
+		exit(1);
+	}
+	while(true){
 		command = readCommand();
-		if(!executeCommand(command)) printError();
-		exit = true; //Esto actualmente esta para no probocar un bucle infinito
+		if(!executeCommand(prepareCommand(command))) printError();//Esto tendre que tocarlo para hacer que realize multiejecucion de comandos
 	}
 }
 
