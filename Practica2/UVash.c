@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <unistd.h>
 #include <sys/wait.h>
+#include <ctype.h>
 
 //--- Start Structures definitions ---
 
@@ -22,6 +23,7 @@ void runFiles();
 void printError();
 char *readCommand();
 void deleteNewlineCharacter();
+void removeWhiteSpaces(char *command);
 Command *prepareCommand(char *command);
 bool executeCommand(Command *command);
 bool builtInCommands(Command *command);	
@@ -44,7 +46,7 @@ void runFile(char *argv[]){
 	size_t size = 0;
 	while((nread = getline(&line,&size,fp)) != -1){
 		deleteNewlineCharacter(line);
-		executeCommand(prepareCommand(line));//Aqui lo mismo que en el main, leer multiples comandos en una sola linea y la ejecucion paralela
+		executeCommand(prepareCommand(line));
 	}
 	exit(0);
 }
@@ -68,13 +70,26 @@ void deleteNewlineCharacter(char *text){
 	if(len > 0 && text[len-1] == '\n') text[len-1] = '\0'; 
 }
 
+void removeWhiteSpaces(char *command) {
+    size_t n = strspn(command, " \t\n\r\f\v");
+    if (n > 0) {
+        memmove(command, command + n, strlen(command + n) + 1);
+    }
+}
+
 Command *prepareCommand(char *command){
-	//Antes de llegar aqui se tendria que preprocesar el char *command de cara al paralelismo 
 	char *copyCommand = strdup(command);
+	//Check if the line start with whitespace
+	removeWhiteSpaces(copyCommand);
+	if(isspace((unsigned char)copyCommand[0])){
+		printError();
+		exit(0);
+	}
+
 	Command *preprocessCommand = (Command *)malloc(sizeof(Command));
 	preprocessCommand->arguments = (char **)malloc(sizeof(char *) * 10);
 	int i = 1;
-
+	
 	//Capture of the first element of the command	
 	char *commandSplited = strtok(copyCommand," \t");
 	preprocessCommand->command = strdup(commandSplited);
@@ -106,8 +121,6 @@ Command *prepareCommand(char *command){
 
 bool executeCommand(Command *command){
 	int status;
-	//printf("Comando:%s\n",command->command);
-	//if(command->arguments[1]==NULL)printf("Es null");
 	if(builtInCommands(command)) return true;
 	pid_t pid = fork();
 	if(pid == -1){
@@ -115,13 +128,11 @@ bool executeCommand(Command *command){
 		exit(1);
 	}
 	if(pid == 0){
-//ESTO SE TIENE QUE ARREGLAR (hay que hacer que el comando se ejecute correctamente)
 		if (command->outFile != NULL) {
 			printf("Hace esto otro");
 			FILE *fp = fopen(command->outFile, "w");
 			dup2(fileno(fp),1);
 			dup2(fileno(fp),2);
-
 		}
        		if(execvp(command->command,command->arguments) == -1){
 			printError();
@@ -136,7 +147,6 @@ bool executeCommand(Command *command){
 
 
 bool builtInCommands(Command *command){
-	//printf("Argumento:%s\n",command->arguments[1]);
 	if(strcmp(command->command,"exit")==0){
 	       	if(command->arguments[1]==NULL) exit(0);
 		else printError();
@@ -169,7 +179,7 @@ int main (int argc, char *argv[]){
 	}
 	while(true){
 		command = readCommand();
-		if(!executeCommand(prepareCommand(command))) printError();//Esto tendre que tocarlo para hacer que realize multiejecucion de comandos
+		if(!executeCommand(prepareCommand(command))) printError();
 	}
 }
 
